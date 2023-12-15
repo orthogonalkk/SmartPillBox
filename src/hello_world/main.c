@@ -195,9 +195,63 @@ void LCD_show()
 
 }
 
+
+// alarm
+
+uint16_t hsv_to_rgb(int h,int s,int v)
+{
+    float R = 0, G =0, B =0;
+
+    float C = 0,X = 0,Y = 0,Z = 0;
+    int i=0;
+    float H=(float)(h);
+    float S=(float)(s)/100.0;
+    float V=(float)(v)/100.0;
+    if(S == 0)
+        R = G = B = V;
+    else
+    {
+        H = H/60;
+        i = (int)H;
+        C = H - i;
+ 
+        X = V * (1 - S);
+        Y = V * (1 - S*C);
+        Z = V * (1 - S*(1-C));
+        switch(i){
+            case 0 : R = V; G = Z; B = X; break;
+            case 1 : R = Y; G = V; B = X; break;
+            case 2 : R = X; G = V; B = Z; break;
+            case 3 : R = X; G = Y; B = V; break;
+            case 4 : R = Z; G = X; B = V; break;
+            case 5 : R = V; G = X; B = Y; break;
+        }
+    }
+    uint16_t r = (uint16_t) (R * 255.0);
+    uint16_t g = (uint16_t) (G * 255.0);
+    uint16_t b = (uint16_t) (B * 255.0);
+    return ((b >> 3) << 0) | ((g >> 2) << 5) | ((r >> 3) << 11);
+}
+
 void time_alarm()
 {
-
+    uint16_t colors[360];
+    for (size_t i = 0; i < 360; i++)
+    {
+        colors[i] = hsv_to_rgb(i, 100, 100);
+    }
+    while (true)
+    {
+        for(int i=0;i<360;i++)
+        {
+            for(int j = 0; j < sizeof(g_lcd_gram) / sizeof(g_lcd_gram[0]); j++)
+            {
+                g_lcd_gram[j] = colors[i];
+            }
+            lcd_draw_picture(0,0, LCD_Y_MAX, LCD_X_MAX,(uint32_t*) g_lcd_gram);
+        }
+    }
+    
 }
 
 
@@ -215,6 +269,7 @@ int main()
     uart_init(UART_NUM);
     uart_configure(UART_NUM, 115200, 8, UART_STOP_1, UART_PARITY_NONE);
 
+    time_alarm();
     input_info();
     LCD_timer();
    
