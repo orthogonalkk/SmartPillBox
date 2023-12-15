@@ -57,6 +57,7 @@
         "xtr1common": "cpp",
         "gpio.h": "c",
         "fpioa.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "pwm.h": "c"
     }
 }
