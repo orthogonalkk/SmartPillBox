@@ -39,6 +39,9 @@ uint8_t recv_buf[128];
 #define TIMER_PWM   1
 #define TIMER_PWM_CHN 0
 
+#define PIN_KEY 13
+#define GPIO_KEY 2
+
 uint16_t g_lcd_gram[LCD_X_MAX * LCD_Y_MAX ];
 
 struct content
@@ -63,6 +66,11 @@ static void io_set_power(void)
 
 void io_mux_init(void)
 {
+    // key
+    fpioa_set_function(PIN_KEY, FUNC_GPIOHS2);
+    gpiohs_set_drive_mode(GPIO_KEY, GPIO_DM_INPUT_PULL_UP);
+    gpiohs_set_pin_edge(GPIO_KEY, GPIO_PE_BOTH);
+
     fpioa_set_function(4, FUNC_UART1_RX + UART_NUM * 2);
     fpioa_set_function(5, FUNC_UART1_TX + UART_NUM * 2);
     fpioa_set_function(10, FUNC_TIMER1_TOGGLE1);
@@ -80,6 +88,25 @@ void io_mux_init(void)
     gpiohs_set_drive_mode(LCD_BLIGHT_IO, GPIO_DM_OUTPUT);
     gpiohs_set_pin(LCD_BLIGHT_IO, GPIO_PV_LOW);
 }
+
+/*
+等待按键切换状态
+*/
+bool wait_key()
+{
+    // 如果0.2s内按键值为0，返回true
+    // uint64_t start = sysctl_get_time_us();
+    // while (gpiohs_get_pin(GPIO_KEY) == GPIO_PV_HIGH)
+    // {
+    //     if (sysctl_get_time_us() - start > 200000)
+    //     {
+    //         return true;
+    //     }
+    // }
+    // return false;
+    return gpiohs_get_pin(GPIO_KEY) == GPIO_PV_LOW;
+}
+
 
 /*
 UART INPUT
@@ -248,6 +275,10 @@ void time_alarm()
             }
             lcd_draw_picture(0,0, LCD_Y_MAX, LCD_X_MAX,(uint32_t*) g_lcd_gram);
         }
+        if (wait_key())
+        {
+            break;
+        }
     }
     
 }
@@ -267,21 +298,15 @@ void LCD_show()
     for(int i =0; i< medicine_count;i++)
     {
         ram_draw_string((uint32_t* ) g_lcd_gram, x, y, total_medicine[i].name, WHITE);
-        uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *) total_medicine[i].name , strlen(total_medicine[i].name));
-        y+=20;
+        // uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *) total_medicine[i].name , strlen(total_medicine[i].name));
+        x += 50;
         ram_draw_string((uint32_t* ) g_lcd_gram, x, y, total_medicine[i].how, WHITE);
-        uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *) total_medicine[i].how , strlen(total_medicine[i].how));
-        x+=150;
-        y=50;
+        // uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *) total_medicine[i].how , strlen(total_medicine[i].how));
+        y += 20;
+        x = 20;
     }
     lcd_draw_picture(0,0, LCD_Y_MAX, LCD_X_MAX,(uint32_t*) g_lcd_gram);
 }
-
-/*
-等待按键切换状态
-*/
-
-
 
 int main()
 {
@@ -297,8 +322,8 @@ int main()
     uart_init(UART_NUM);
     uart_configure(UART_NUM, 115200, 8, UART_STOP_1, UART_PARITY_NONE);
 
-    // input_info();
-    // LCD_timer();
-    // time_alarm();
-    LCD_show();
+    //input_info();
+    //LCD_timer();
+    time_alarm();
+    //LCD_show();
 }
