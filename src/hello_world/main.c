@@ -172,6 +172,10 @@ void input_info()
 
 }
 
+/*
+LCD 显示计时
+*/
+
 void LCD_timer()
 {
     int t = medicine_interval;
@@ -188,30 +192,9 @@ void LCD_timer()
     
 }
 
-void LCD_show()
-{
-    memset(g_lcd_gram, 0, sizeof(g_lcd_gram));
-    char *hel = {"dose count:"};
-    ram_draw_string((uint32_t* ) g_lcd_gram, 20, 20, hel , RED);    
-    int x =20, y= 50;
-    char dose[10];
-    itoa(dose_time, dose, 10 );
-    ram_draw_string((uint32_t* ) g_lcd_gram, 170, 20, dose , RED);
-    for(int i =0; i< medicine_count;i++)
-    {
-        ram_draw_string((uint32_t* ) g_lcd_gram, x, y, total_medicine[i].name, WHITE);
-        uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *) total_medicine[i].name , strlen(total_medicine[i].name));
-        y+=20;
-        ram_draw_string((uint32_t* ) g_lcd_gram, x, y, total_medicine[i].how, WHITE);
-        uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *) total_medicine[i].how , strlen(total_medicine[i].how));
-        x+=150;
-        y=50;
-    }
-    lcd_draw_picture(0,0, LCD_Y_MAX, LCD_X_MAX,(uint32_t*) g_lcd_gram);
-}
-
-
-// alarm
+/*
+LCD 到时间提醒
+*/
 
 uint16_t hsv_to_rgb(int h,int s,int v)
 {
@@ -269,6 +252,36 @@ void time_alarm()
     
 }
 
+/*
+LCD 显示药品资料
+*/
+void LCD_show()
+{
+    memset(g_lcd_gram, 0, sizeof(g_lcd_gram));
+    char *hel = {"dose count:"};
+    ram_draw_string((uint32_t* ) g_lcd_gram, 20, 20, hel , RED);    
+    int x =20, y= 50;
+    char dose[10];
+    itoa(dose_time, dose, 10 );
+    ram_draw_string((uint32_t* ) g_lcd_gram, 170, 20, dose , RED);
+    for(int i =0; i< medicine_count;i++)
+    {
+        ram_draw_string((uint32_t* ) g_lcd_gram, x, y, total_medicine[i].name, WHITE);
+        uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *) total_medicine[i].name , strlen(total_medicine[i].name));
+        y+=20;
+        ram_draw_string((uint32_t* ) g_lcd_gram, x, y, total_medicine[i].how, WHITE);
+        uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *) total_medicine[i].how , strlen(total_medicine[i].how));
+        x+=150;
+        y=50;
+    }
+    lcd_draw_picture(0,0, LCD_Y_MAX, LCD_X_MAX,(uint32_t*) g_lcd_gram);
+}
+
+/*
+等待按键切换状态
+*/
+
+
 
 int main()
 {
@@ -285,7 +298,7 @@ int main()
     uart_configure(UART_NUM, 115200, 8, UART_STOP_1, UART_PARITY_NONE);
 
     // input_info();
-    LCD_show();
     // LCD_timer();
     // time_alarm();
+    LCD_show();
 }

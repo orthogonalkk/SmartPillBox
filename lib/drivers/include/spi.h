@@ -15,8 +15,8 @@
 #ifndef _DRIVER_SPI_H
 #define _DRIVER_SPI_H
 
-#include <stddef.h>
 #include <stdint.h>
+#include <stddef.h>
 #include "dmac.h"
 
 #ifdef __cplusplus
@@ -140,11 +140,12 @@ typedef enum _spi_transfer_mode
     SPI_TMOD_EEROM
 } spi_transfer_mode_t;
 
+
 typedef enum _spi_transfer_width
 {
-    SPI_TRANS_CHAR = 0x1,
+    SPI_TRANS_CHAR  = 0x1,
     SPI_TRANS_SHORT = 0x2,
-    SPI_TRANS_INT = 0x4,
+    SPI_TRANS_INT   = 0x4,
 } spi_transfer_width_t;
 
 typedef enum _spi_chip_select
@@ -197,9 +198,6 @@ typedef struct _spi_slave_instance
     volatile uint8_t *config_ptr;
     uint32_t config_len;
     spi_slave_receive_callback_t callback;
-    uint8_t is_dual;
-    uint8_t mosi_pin;
-    uint8_t miso_pin;
 } spi_slave_instance_t;
 
 typedef struct _spi_data_t
@@ -449,9 +447,9 @@ uint32_t spi_set_clk_rate(spi_device_num_t spi_num, uint32_t spi_clk);
  *
  */
 void spi_dup_send_receive_data_dma(dmac_channel_number_t dma_send_channel_num,
-                                   dmac_channel_number_t dma_receive_channel_num,
-                                   spi_device_num_t spi_num, spi_chip_select_t chip_select,
-                                   const uint8_t *tx_buf, size_t tx_len, uint8_t *rx_buf, size_t rx_len);
+                               dmac_channel_number_t dma_receive_channel_num,
+                               spi_device_num_t spi_num, spi_chip_select_t chip_select,
+                               const uint8_t *tx_buf, size_t tx_len, uint8_t *rx_buf, size_t rx_len);
 
 /**
  * @brief       Set spi slave configuration
@@ -467,16 +465,6 @@ void spi_dup_send_receive_data_dma(dmac_channel_number_t dma_send_channel_num,
  * @return      Void
  */
 void spi_slave_config(uint8_t int_pin, uint8_t ready_pin, dmac_channel_number_t dmac_channel, size_t data_bit_length, uint8_t *data, uint32_t len, spi_slave_receive_callback_t callback);
-
-void spi_slave_dual_config(uint8_t int_pin,
-                           uint8_t ready_pin,
-                           uint8_t mosi_pin,
-                           uint8_t miso_pin,
-                           dmac_channel_number_t dmac_channel,
-                           size_t data_bit_length,
-                           uint8_t *data,
-                           uint32_t len,
-                           spi_slave_receive_callback_t callback);
 
 /**
  * @brief       Spi handle transfer data operations

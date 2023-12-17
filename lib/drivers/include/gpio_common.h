@@ -48,3 +48,4 @@ typedef enum _gpio_pin_value
 #endif
 
 #endif /* _GPIO_COMMON_H */
+

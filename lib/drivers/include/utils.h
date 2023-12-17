@@ -33,8 +33,6 @@ extern "C" {
 #define KENDRYTE_MIN(a, b) ((a) > (b) ? (b) : (a))
 #define KENDRYTE_MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define FIX_CACHE 1
-
 #ifdef __ASSEMBLY__
 #define KENDRYTE_CAST(type, ptr) ptr
 #else /* __ASSEMBLY__ */
@@ -71,7 +69,7 @@ extern "C" {
  * @param[in]   src         8 bit data byte to write to memory
  */
 #define kendryte_write_byte(dest, src) \
-    (*KENDRYTE_CAST(volatile uint8_t *, (dest)) = (src))
+    (*KENDRYTE_CAST(volatile uint8_t*, (dest)) = (src))
 
 /**
  * @brief       Read and return the 8 bit byte from the source address in device memory.
@@ -80,7 +78,7 @@ extern "C" {
  *
  * @return      8 bit data byte value
  */
-#define kendryte_read_byte(src) (*KENDRYTE_CAST(volatile uint8_t *, (src)))
+#define kendryte_read_byte(src) (*KENDRYTE_CAST(volatile uint8_t*, (src)))
 
 /**
  * @brief       Write the 16 bit half word to the destination address in device memory.
@@ -89,7 +87,7 @@ extern "C" {
  * @param[in]   src         16 bit data half word to write to memory
  */
 #define kendryte_write_hword(dest, src) \
-    (*KENDRYTE_CAST(volatile uint16_t *, (dest)) = (src))
+    (*KENDRYTE_CAST(volatile uint16_t*, (dest)) = (src))
 
 /**
  * @brief       Read and return the 16 bit half word from the source address in device
@@ -98,7 +96,7 @@ extern "C" {
  *
  * @return      16 bit data half word value
  */
-#define kendryte_read_hword(src) (*KENDRYTE_CAST(volatile uint16_t *, (src)))
+#define kendryte_read_hword(src) (*KENDRYTE_CAST(volatile uint16_t*, (src)))
 
 /**
  * @brief       Write the 32 bit word to the destination address in device memory.
@@ -107,7 +105,7 @@ extern "C" {
  * @param[in]   src         32 bit data word to write to memory
  */
 #define kendryte_write_word(dest, src) \
-    (*KENDRYTE_CAST(volatile uint32_t *, (dest)) = (src))
+    (*KENDRYTE_CAST(volatile uint32_t*, (dest)) = (src))
 
 /**
  * @brief       Read and return the 32 bit word from the source address in device memory.
@@ -116,7 +114,7 @@ extern "C" {
  *
  * @return      32 bit data half word value
  */
-#define kendryte_read_word(src) (*KENDRYTE_CAST(volatile uint32_t *, (src)))
+#define kendryte_read_word(src) (*KENDRYTE_CAST(volatile uint32_t*, (src)))
 
 /**
  * @brief       Write the 64 bit double word to the destination address in device memory.
@@ -125,7 +123,7 @@ extern "C" {
  * @param[in]   src         64 bit data word to write to memory
  */
 #define kendryte_write_dword(dest, src) \
-    (*KENDRYTE_CAST(volatile uint64_t *, (dest)) = (src))
+    (*KENDRYTE_CAST(volatile uint64_t*, (dest)) = (src))
 
 /**
  * @brief       Read and return the 64 bit double word from the source address in device
@@ -134,7 +132,7 @@ extern "C" {
  *
  * @return      64 bit data half word value
  */
-#define kendryte_read_dword(src) (*KENDRYTE_CAST(volatile uint64_t *, (src)))
+#define kendryte_read_dword(src) (*KENDRYTE_CAST(volatile uint64_t*, (src)))
 
 /**
  * @brief       Set selected bits in the 8 bit byte at the destination address in device
@@ -284,12 +282,12 @@ extern "C" {
 #define kendryte_replbits_dword(dest, msk, src) \
     (kendryte_write_dword(dest, (kendryte_read_dword(dest) & ~(msk)) | ((src) & (msk))))
 
-#define configASSERT(x)                                   \
-    if((x) == 0)                                          \
-    {                                                     \
+#define configASSERT(x)                                 \
+    if ((x) == 0)                                       \
+    {                                                   \
         printf("(%s:%d) %s\r\n", __FILE__, __LINE__, #x); \
-        for(;;)                                           \
-            ;                                             \
+        for (;;)                                        \
+            ;                                           \
     }
 
 /**
@@ -342,8 +340,8 @@ uint32_t get_bit(volatile uint32_t *bits, uint32_t mask, size_t offset);
  */
 uint32_t get_gpio_bit(volatile uint32_t *bits, size_t offset);
 
-uint32_t is_memory_cache(uintptr_t address);
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 #endif /* _DRIVER_COMMON_H */
+

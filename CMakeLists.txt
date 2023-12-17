@@ -1,10 +1,10 @@
-# DO NOT MODIFY THIS FILE, IT WILL BE OVERRIDE!!!
+### This file is used for build example projects.
 
 # set this will supress some warnings
-cmake_minimum_required(VERSION 3.8)
 set(BUILDING_SDK "yes" CACHE INTERNAL "")
 
 set(PROJ hello_world)
+
 # basic config
 if (NOT PROJ)
     get_filename_component(PROJ ${CMAKE_CURRENT_BINARY_DIR} DIRECTORY)
@@ -14,6 +14,7 @@ if (NOT PROJ)
 else()
     message("PROJ = ${PROJ}")
 endif ()
+cmake_minimum_required(VERSION 3.0)
 include(./cmake/common.cmake)
 project(${PROJ} C CXX ASM)
 
@@ -22,10 +23,6 @@ include(./cmake/macros.internal.cmake)
 header_directories(${SDK_ROOT}/lib)
 header_directories(src/${PROJ})
 header_directories(kendryte-standalone-demo/${PROJ})
-
-add_subdirectory(third_party/gsl-lite)
-add_subdirectory(third_party/mpark-variant)
-add_subdirectory(third_party/nlohmann_json)
 # build library first
 add_subdirectory(lib)
 

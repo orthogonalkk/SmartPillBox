@@ -31,8 +31,6 @@ function(JOIN VALUES GLUE OUTPUT)
     set(${OUTPUT} "${_TMP_STR}" PARENT_SCOPE)
 endfunction()
 
-global_set(CMAKE_C_FLAGS "")
-global_set(CMAKE_CXX_FLAGS "")
 global_set(LDFLAGS "")
 global_set(CMAKE_EXE_LINKER_FLAGS "")
 global_set(CMAKE_SHARED_LINKER_FLAGS "")

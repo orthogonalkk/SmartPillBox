@@ -1,8 +1,8 @@
-#include <stdlib.h>
 #include <sys/lock.h>
+#include <stdlib.h>
 #include "bsp.h"
 
-#define LOCK_MAX_NUM (1024)
+#define LOCK_MAX_NUM    (1024)
 
 typedef long _lock_t;
 
@@ -14,7 +14,6 @@ typedef struct
 } reculock_t;
 
 reculock_t reculock[LOCK_MAX_NUM];
-static _lock_t reculock_mutex;
 
 void show_error(void)
 {
@@ -38,8 +37,7 @@ static inline long lock_trylock(_lock_t *lock)
 
 static inline void lock_lock(_lock_t *lock)
 {
-    while(lock_trylock(lock))
-        ;
+    while (lock_trylock(lock));
 }
 
 static inline void lock_unlock(_lock_t *lock)
@@ -47,7 +45,7 @@ static inline void lock_unlock(_lock_t *lock)
     /* Use memory barrier to keep coherency */
     mb();
     atomic_swap(lock, 0);
-    asm volatile("nop");
+    asm volatile ("nop");
 }
 
 static reculock_t *get_reculock(_lock_t *lock)
@@ -74,17 +72,17 @@ static reculock_t *get_free_reculock(void)
 
 static reculock_t *reculock_init(_lock_t *lock)
 {
-    lock_lock(&reculock_mutex);
     reculock_t *v_reculock = get_free_reculock();
-    if(v_reculock)
+    if(v_reculock == NULL)
     {
-        *v_reculock = (reculock_t){
-            .lock = lock,
-            .counter = 0,
-            .core = 0,
-        };
+        return NULL;
     }
-    lock_unlock(&reculock_mutex);
+    *v_reculock = (reculock_t)
+    {
+        .lock = lock,
+        .counter = 0,
+        .core = 0,
+    };
     return v_reculock;
 }
 
@@ -94,7 +92,8 @@ static void reculock_deinit(_lock_t *lock)
     reculock_t *v_reculock = get_reculock(lock);
     if(v_reculock)
     {
-        *v_reculock = (reculock_t){
+        *v_reculock = (reculock_t)
+        {
             .lock = NULL,
             .counter = 0,
             .core = 0,
@@ -126,18 +125,20 @@ static inline int reculock_trylock(_lock_t *lock)
         }
     }
 
-    if(v_reculock->counter == 0)
+    if (v_reculock->counter == 0)
     {
         /* First time get lock */
         v_reculock->counter++;
         v_reculock->core = core;
         res = 0;
-    } else if(v_reculock->core == core)
+    }
+    else if (v_reculock->core == core)
     {
         /* Same core get lock */
         v_reculock->counter++;
         res = 0;
-    } else
+    }
+    else
     {
         /* Different core get lock */
         res = -1;
@@ -166,24 +167,26 @@ static inline void reculock_lock(_lock_t *lock)
         }
     }
 
-    if(v_reculock->counter == 0)
+    if (v_reculock->counter == 0)
     {
         /* First time get lock */
         v_reculock->counter++;
         v_reculock->core = core;
-    } else if(v_reculock->core == core)
+    }
+    else if (v_reculock->core == core)
     {
         /* Same core get lock */
         v_reculock->counter++;
-    } else
+    }
+    else
     {
         /* Different core get lock */
         lock_unlock(lock);
         do
         {
-            while(atomic_read(&reculock->counter))
+            while (atomic_read(&reculock->counter))
                 ;
-        } while(reculock_trylock(lock));
+        } while (reculock_trylock(lock));
         return;
     }
     lock_unlock(lock);
@@ -204,17 +207,18 @@ static inline void reculock_unlock(_lock_t *lock)
         show_error();
     }
 
-    if(v_reculock->core == core)
+    if (v_reculock->core == core)
     {
         /* Same core release lock */
         v_reculock->counter--;
-        if(v_reculock->counter <= 0)
+        if (v_reculock->counter <= 0)
         {
             v_reculock->core = 0;
             v_reculock->counter = 0;
             v_reculock->lock = NULL;
         }
-    } else
+    }
+    else
     {
         /* Different core release lock */
         lock_unlock(lock);
@@ -272,3 +276,4 @@ void _lock_release_recursive(_lock_t *lock)
 {
     reculock_unlock(lock);
 }
+
