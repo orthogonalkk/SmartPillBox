@@ -53,6 +53,7 @@ struct content
 struct content total_medicine[20];
 int medicine_count = 0;
 int medicine_interval = 0;
+int dose_time = 0;
 
 static void io_set_power(void)
 {
@@ -114,10 +115,10 @@ void input_info()
             }
             else if (recv == '\n')
             {
-                uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *)cmd, strlen(cmd));
+                // uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *)cmd, strlen(cmd));
                 if (strcmp(cmd, "q") == 0)
                 {
-                    uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *)cmd, strlen(cmd));
+                    // uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *)cmd, strlen(cmd));
                     rec_flag =2;
                 }
                 if (rec_flag == 0) // name
@@ -158,7 +159,10 @@ void input_info()
     while(1)
     {
         uart_receive_data_dma(UART_NUM, DMAC_CHANNEL1, (uint8_t *)&recv, 1);    /*block wait for receive*/
-        if (recv == '\n')
+        if (recv == '\r') {
+                continue;
+            }
+        else if (recv == '\n')
         {
             medicine_interval = atoi(cmd);
             break;
@@ -171,7 +175,6 @@ void input_info()
 void LCD_timer()
 {
     int t = medicine_interval;
-    t=60;
     while (t>=0)
     {
         char time[10];
@@ -187,7 +190,24 @@ void LCD_timer()
 
 void LCD_show()
 {
-
+    memset(g_lcd_gram, 0, sizeof(g_lcd_gram));
+    char *hel = {"dose count:"};
+    ram_draw_string((uint32_t* ) g_lcd_gram, 20, 20, hel , RED);    
+    int x =20, y= 50;
+    char dose[10];
+    itoa(dose_time, dose, 10 );
+    ram_draw_string((uint32_t* ) g_lcd_gram, 170, 20, dose , RED);
+    for(int i =0; i< medicine_count;i++)
+    {
+        ram_draw_string((uint32_t* ) g_lcd_gram, x, y, total_medicine[i].name, WHITE);
+        uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *) total_medicine[i].name , strlen(total_medicine[i].name));
+        y+=20;
+        ram_draw_string((uint32_t* ) g_lcd_gram, x, y, total_medicine[i].how, WHITE);
+        uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *) total_medicine[i].how , strlen(total_medicine[i].how));
+        x+=150;
+        y=50;
+    }
+    lcd_draw_picture(0,0, LCD_Y_MAX, LCD_X_MAX,(uint32_t*) g_lcd_gram);
 }
 
 
@@ -264,7 +284,8 @@ int main()
     uart_init(UART_NUM);
     uart_configure(UART_NUM, 115200, 8, UART_STOP_1, UART_PARITY_NONE);
 
-    input_info();
-    LCD_timer();
-    time_alarm();
+    // input_info();
+    LCD_show();
+    // LCD_timer();
+    // time_alarm();
 }
