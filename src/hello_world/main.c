@@ -93,8 +93,7 @@ void input_info()
     char recv = 0;
     int rec_flag = 0;
     char cmd[20] = {};
-    bool input_finish = false;
-    int i = 0;
+    int len = 0;
 
     while (1)
     {   
@@ -119,40 +118,36 @@ void input_info()
                 if (strcmp(cmd, "q") == 0)
                 {
                     uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *)cmd, strlen(cmd));
-                    input_finish = true;
                     rec_flag =2;
                 }
                 if (rec_flag == 0) // name
                 {
                     sprintf(total_medicine[medicine_count].name, "%s", cmd);
                     // uart_send_data_dma(UART_NUM, DMAC_CHANNEL2, (uint8_t *)cmd, strlen(cmd));
+                    rec_flag =1;
                 }
                 else if (rec_flag == 1) // how
                 {
                     sprintf(total_medicine[medicine_count].how, "%s", cmd);
-                }  
-                i = 0;
-                cmd[0] = 0;
-                rec_flag ++;
-                if (rec_flag >=2)
-                {
-                    rec_flag = 0;
+                    rec_flag =  0;
                     medicine_count ++;
-                }
+                }  
+                len = 0;
+                cmd[0] = 0;
                 break;
             }
             else {
-                cmd[i++] = recv;
-                cmd[i] = 0;
-                if(i >= RECV_LENGTH)
+                cmd[len++] = recv;
+                cmd[len] = 0;
+                if(len >= RECV_LENGTH)
                 {
-                    i = 0;
+                    len = 0;
                     *cmd =0;
                     rec_flag = 0;
                 } 
             }
         }
-       if (input_finish)
+       if (rec_flag == 2)
        {
             *cmd = 0;
            break;
@@ -168,7 +163,7 @@ void input_info()
             medicine_interval = atoi(cmd);
             break;
         }
-        cmd [i++] = recv;
+        cmd [len++] = recv;
     }
 
 }
@@ -269,8 +264,7 @@ int main()
     uart_init(UART_NUM);
     uart_configure(UART_NUM, 115200, 8, UART_STOP_1, UART_PARITY_NONE);
 
-    time_alarm();
     input_info();
     LCD_timer();
-   
+    time_alarm();
 }
