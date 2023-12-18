@@ -1,5 +1,10 @@
 {
     "files.associations": {
-        "image_process.h": "c"
+        "image_process.h": "c",
+        "sysctl.h": "c",
+        "unistd.h": "c",
+        "fpioa.h": "c",
+        "string.h": "c",
+        "gc0328.h": "c"
     }
 }

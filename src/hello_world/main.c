@@ -19,6 +19,8 @@
 #include "uart.h"
 #include "gpiohs.h"
 #include "sysctl.h"
+#include "plic.h"
+#include "utils.h"
 #include <unistd.h>
 #include <string.h>
 #include <pwm.h>
@@ -27,6 +29,30 @@
 #include "board_config.h"
 #include "nt35310.h"
 #include "lcd.h"
+#include <math.h>
+#include "bsp.h"
+#include "dvp.h"
+
+#if (BOARD_VERSION == BOARD_V1_2_LE)
+#include "ov2640.h"
+#elif (BOARD_VERSION == BOARD_V1_3)
+#include "key.h"
+#include "pwm.h"
+#include "gc0328.h"
+#include "tick.h"
+#endif
+
+#include "uarths.h"
+#include "kpu.h"
+#include "region_layer.h"
+#include "image_process.h"
+#include "w25qxx.h"
+#define INCBIN_STYLE INCBIN_STYLE_SNAKE
+#define INCBIN_PREFIX
+#include "incbin.h"
+
+#define PLL0_OUTPUT_FREQ 800000000UL
+#define PLL1_OUTPUT_FREQ 400000000UL
 
 #define RECV_LENGTH  20
 
@@ -67,9 +93,10 @@ static void io_set_power(void)
 void io_mux_init(void)
 {
     // key
-    fpioa_set_function(PIN_KEY, FUNC_GPIOHS2);
-    gpiohs_set_drive_mode(GPIO_KEY, GPIO_DM_INPUT_PULL_UP);
-    gpiohs_set_pin_edge(GPIO_KEY, GPIO_PE_BOTH);
+    fpioa_set_function(KEY_PIN, FUNC_GPIOHS0 + KEY_IO);
+    gpiohs_set_drive_mode(KEY_IO, GPIO_DM_INPUT_PULL_UP);
+    gpiohs_set_pin_edge(KEY_IO, GPIO_PE_FALLING);
+    gpiohs_irq_register(KEY_IO, 1, key_trigger, NULL);
 
     fpioa_set_function(4, FUNC_UART1_RX + UART_NUM * 2);
     fpioa_set_function(5, FUNC_UART1_TX + UART_NUM * 2);
@@ -104,7 +131,18 @@ bool wait_key()
     //     }
     // }
     // return false;
-    return gpiohs_get_pin(GPIO_KEY) == GPIO_PV_LOW;
+    // char key[10];
+    // sprintf(key, "%d", gpiohs_get_pin(GPIO_KEY));
+    // uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *)key, strlen(key));
+    // return gpiohs_get_pin(GPIO_KEY) == GPIO_PV_HIGH;
+    if (gpiohs_get_pin(KEY_IO)==0)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 
@@ -267,6 +305,8 @@ void time_alarm()
     }
     while (true)
     {
+        if (wait_key())
+            break;
         for(int i=0;i<360;i++)
         {
             for(int j = 0; j < sizeof(g_lcd_gram) / sizeof(g_lcd_gram[0]); j++)
@@ -275,10 +315,11 @@ void time_alarm()
             }
             lcd_draw_picture(0,0, LCD_Y_MAX, LCD_X_MAX,(uint32_t*) g_lcd_gram);
         }
-        if (wait_key())
-        {
-            break;
-        }
+        //bool keys =wait_key();
+        // bool keys = gpiohs_get_pin(KEY_IO);
+        // char key[10];
+        // sprintf(key, "%d", keys);
+        // uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *)key, strlen(key));
     }
     
 }
@@ -318,6 +359,9 @@ int main()
     lcd_set_direction(DIR_YX_RLDU);
     lcd_clear(BLACK);
 
+#if (BOARD_VERSION == BOARD_V1_3)
+    tick_init(TICK_NANOSECONDS);
+#endif
 
     uart_init(UART_NUM);
     uart_configure(UART_NUM, 115200, 8, UART_STOP_1, UART_PARITY_NONE);
