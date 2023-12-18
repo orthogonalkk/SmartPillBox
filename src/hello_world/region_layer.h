@@ -34,14 +34,18 @@ typedef struct
     uint32_t layer_height;
     uint32_t boxes_number;
     uint32_t output_number;
+    float scale;
+    float bias;
     void *boxes;
-    float *input;
+    uint8_t *input;
     float *output;
     float *probs_buf;
     float **probs;
+    float *activate;
+    float *softmax;
 } region_layer_t;
 
-int region_layer_init(region_layer_t *rl, int width, int height, int channels, int origin_width, int origin_height);
+int region_layer_init(region_layer_t *rl, kpu_task_t *task);
 void region_layer_deinit(region_layer_t *rl);
 void region_layer_run(region_layer_t *rl, obj_info_t *obj_info);
 

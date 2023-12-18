@@ -5,6 +5,7 @@
         "unistd.h": "c",
         "fpioa.h": "c",
         "string.h": "c",
-        "gc0328.h": "c"
+        "gc0328.h": "c",
+        "kpu.h": "c"
     }
 }

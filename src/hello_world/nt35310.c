@@ -34,22 +34,11 @@ static void set_dcx_data(void)
     gpiohs_set_pin(LCD_DC_IO, GPIO_PV_HIGH);
 }
 
-static void init_rst(void)
-{
-    gpiohs_set_drive_mode(LCD_RST_IO, GPIO_DM_OUTPUT);
-    gpiohs_set_pin(LCD_RST_IO, GPIO_PV_LOW);
-    usleep(100000);
-    gpiohs_set_pin(LCD_RST_IO, GPIO_PV_HIGH);
-    usleep(100000);
-}
-
 void tft_hard_init(void)
 {
     init_dcx();
-    init_rst();
     spi_init(SPI_CHANNEL, SPI_WORK_MODE_0, SPI_FF_OCTAL, 8, 0);
-    init_rst();
-    spi_set_clk_rate(SPI_CHANNEL, 18000000);
+    spi_set_clk_rate(SPI_CHANNEL, 15000000);
 }
 
 void tft_write_command(uint8_t cmd)

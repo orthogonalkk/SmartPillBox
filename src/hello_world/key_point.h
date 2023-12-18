@@ -12,26 +12,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef _IMAGE_PROCESS_H
-#define _IMAGE_PROCESS_H
+#ifndef _KEY_POINT_H
+#define _KEY_POINT_H
 
 #include <stdint.h>
+#include "kpu.h"
 
 typedef struct
 {
-    uint8_t *addr;
-    uint16_t width;
-    uint16_t height;
-    uint16_t pixel;
-    uint16_t format;
-} image_t;
+    uint32_t width;
+    uint32_t height;
+    struct
+    {
+        uint32_t x;
+        uint32_t y;
+    } point[5];
+} key_point_t;
 
+void key_point_last_handle(kpu_task_t *task, key_point_t *key_point);
 
-int image_init(image_t *image);
-void image_deinit(image_t *image);
-void image_crop(image_t *image_src, image_t *image_dst, uint16_t x_offset, uint16_t y_offset);
-void image_resize(image_t *image_src, image_t *image_dst);
-void image_umeyama(double *src, double *dst);
-void image_similarity(image_t *image_src, image_t *image_dst, double *T);
-
-#endif /* _IMAGE_PROCESS_H */
+#endif /* _KEY_POINT_H */

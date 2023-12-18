@@ -14,8 +14,6 @@
  */
 #include "board_config.h"
 
-#if (BOARD_VERSION == BOARD_V1_3)
-
 #include "dvp.h"
 #include "fpioa.h"
 #include "i2c.h"
@@ -522,4 +520,3 @@ uint16_t gc0328_exposure_time(void)
 	return exp;
 }
 
-#endif // (BOARD_VERSION == BOARD_V1_3)
