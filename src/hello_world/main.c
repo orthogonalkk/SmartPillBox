@@ -64,6 +64,8 @@ static uint32_t person_count = 0;
 #define FEATURE_DIMENSION 196
 static float features_save[PERSON_MAX][FEATURE_DIMENSION];
 
+uint16_t g_lcd_gram[LCD_X_MAX * LCD_Y_MAX ];
+
 
 static void ai_done(void)
 {
@@ -102,6 +104,8 @@ static int dvp_irq(void *ctx)
 volatile uint32_t g_gpio_flag = 0;
 volatile uint32_t g_key_press = 0;
 volatile uint64_t g_gpio_time = 0;
+volatile uint64_t g_change_state = 0;
+
 int irq_gpiohs(void* ctx)
 {
     printf("Key Working\n");
@@ -124,6 +128,15 @@ void handle_key(void)
             }
         }
         if(v_time_now - g_gpio_time > 1 * 1000 * 1000) /* 长按1s */
+        {
+            if(gpiohs_get_pin(KEY_IO) == 0)
+            {
+                g_change_state = 1;
+                g_gpio_flag = 0;
+            }
+        }
+
+        if(v_time_now - g_gpio_time > 5 * 1000 * 1000) /* 长按5s */
         {
             if(gpiohs_get_pin(KEY_IO) == 0)
             {
@@ -301,6 +314,277 @@ static void draw_key_point(uint32_t *gram, key_point_t *key_point)
     }
 }
 
+
+
+//************************************************
+// add face information
+//************************************************
+
+void add_face()
+{
+    while (1)
+    {
+        handle_key();
+        if (g_change_state)
+        {
+            g_change_state = 0;
+            break;
+        }
+        g_dvp_finish_flag = 0;
+        dvp_clear_interrupt(DVP_STS_FRAME_START | DVP_STS_FRAME_FINISH);
+        dvp_config_interrupt(DVP_CFG_START_INT_ENABLE | DVP_CFG_FINISH_INT_ENABLE, 1);
+        while (g_dvp_finish_flag == 0)
+            ;
+        /* run face detect */
+        g_ai_done_flag = 0;
+        kpu_start(&detect_task);
+        while(!g_ai_done_flag);
+        region_layer_run(&detect_rl, &detect_info);
+        /* run key point detect */
+        for (uint32_t face_cnt = 0; face_cnt < detect_info.obj_number; face_cnt++)
+        {
+            crop_image.pixel = 3;
+            crop_image.width = detect_info.obj[face_cnt].x2 - detect_info.obj[face_cnt].x1 + 1;
+            crop_image.height = detect_info.obj[face_cnt].y2 - detect_info.obj[face_cnt].y1 + 1;
+            key_point.width = crop_image.width;
+            key_point.height = crop_image.height;
+            if (crop_image.width < 80 || crop_image.height < 100)
+            {
+                draw_edge(display_image.addr, &detect_info, face_cnt, RED);
+                continue;
+            }
+            image_init(&crop_image);
+            image_crop(&kpu_image, &crop_image, detect_info.obj[face_cnt].x1, detect_info.obj[face_cnt].y1);
+            image_resize(&crop_image, &resize_image);
+            image_deinit(&crop_image);
+            g_ai_done_flag = 0;
+            kpu_start(&key_point_task);
+            while(!g_ai_done_flag);
+            key_point_last_handle(&key_point_task, &key_point);
+            double matrix_src[5][2], matrix_dst[10];
+            for (uint32_t point_cnt = 0; point_cnt < 5; point_cnt++)
+            {
+                key_point.point[point_cnt].x += detect_info.obj[face_cnt].x1;
+                key_point.point[point_cnt].y += detect_info.obj[face_cnt].y1;
+                matrix_src[point_cnt][0] = key_point.point[point_cnt].x;
+                matrix_src[point_cnt][1] = key_point.point[point_cnt].y;
+            }
+            draw_key_point(display_image.addr, &key_point);
+            image_umeyama(&matrix_src, &matrix_dst);
+            image_similarity(&kpu_image, &resize_image, matrix_dst);
+
+            feature1_task.src = resize_image.addr;
+            g_ai_done_flag = 0;
+            kpu_start(&feature1_task);
+            while (!g_ai_done_flag);
+            quantize_param_t q1 = {.scale = 0.0125532000672583, .bias = 0 }, q2 = {.scale = 0.00478086798798804, .bias = 0};
+            kpu_global_average_pool(feature1_task.dst, &q1, 16, 1024, AI_IO_BASE_ADDR + feature2_task.layers[0].image_addr.data.image_src_addr * 64, &q2);
+            g_ai_done_flag = 0;
+            kpu_start(&feature2_task);
+            while (!g_ai_done_flag);
+            quantize_param_t q = {.scale = feature2_task.output_scale, .bias = feature2_task.output_bias};
+            float features[FEATURE_DIMENSION], features_tmp[FEATURE_DIMENSION];
+            kpu_matmul_end(feature2_task.dst, FEATURE_DIMENSION, features, &q);
+            l2normalize(features, features_tmp, FEATURE_DIMENSION);
+
+            if(g_key_press)
+            {
+                if(flash_save_face_info(NULL, features_tmp) < 0)
+                {
+                    printf("Feature Full\n");
+                    break;
+                }
+                g_key_press = 0;
+            }
+
+            float score, score_max = 0;
+            uint32_t score_index = 0;
+            score_index = calulate_score(features_tmp, &score_max);
+
+            sprintf(display_string, "%.2f", score_max);
+            if (score_max > FACE_RECGONITION_SCORE)
+            {
+                draw_edge(display_image.addr, &detect_info, face_cnt, GREEN);
+                sprintf(display_string, "%d  %.2f", score_index, score_max);
+                ram_draw_string(display_image.addr, detect_info.obj[face_cnt].x1, detect_info.obj[face_cnt].y1 - 16, display_string, GREEN);
+            }
+            else
+            {
+                draw_edge(display_image.addr, &detect_info, face_cnt, RED);
+                ram_draw_string(display_image.addr, detect_info.obj[face_cnt].x1, detect_info.obj[face_cnt].y1 - 16, display_string, RED);
+            }
+        }
+
+        /* display result */
+        lcd_draw_picture(0, 0, 320, 240, display_image.addr);
+    }
+}
+
+//************************************************
+//LCD 到时间提醒
+//************************************************
+
+uint16_t hsv_to_rgb(int h,int s,int v)
+{
+    float R = 0, G =0, B =0;
+
+    float C = 0,X = 0,Y = 0,Z = 0;
+    int i=0;
+    float H=(float)(h);
+    float S=(float)(s)/100.0;
+    float V=(float)(v)/100.0;
+    if(S == 0)
+        R = G = B = V;
+    else
+    {
+        H = H/60;
+        i = (int)H;
+        C = H - i;
+ 
+        X = V * (1 - S);
+        Y = V * (1 - S*C);
+        Z = V * (1 - S*(1-C));
+        switch(i){
+            case 0 : R = V; G = Z; B = X; break;
+            case 1 : R = Y; G = V; B = X; break;
+            case 2 : R = X; G = V; B = Z; break;
+            case 3 : R = X; G = Y; B = V; break;
+            case 4 : R = Z; G = X; B = V; break;
+            case 5 : R = V; G = X; B = Y; break;
+        }
+    }
+    uint16_t r = (uint16_t) (R * 255.0);
+    uint16_t g = (uint16_t) (G * 255.0);
+    uint16_t b = (uint16_t) (B * 255.0);
+    return ((b >> 3) << 0) | ((g >> 2) << 5) | ((r >> 3) << 11);
+}
+
+void time_alarm()
+{
+    lcd_clear(BLACK);
+    uint16_t colors[360];
+    for (size_t i = 0; i < 360; i++)
+    {
+        colors[i] = hsv_to_rgb(i, 100, 100);
+    }
+    while (true)
+    {
+        handle_key();
+        if (g_key_press == 1)
+        {
+            g_key_press = 0;
+            break;
+        }
+        for(int i=0;i<360;i++)
+        {
+            for(int j = 0; j < sizeof(g_lcd_gram) / sizeof(g_lcd_gram[0]); j++)
+            {
+                g_lcd_gram[j] = colors[i];
+            }
+            lcd_draw_picture(0,0, LCD_Y_MAX, LCD_X_MAX,(uint32_t*) g_lcd_gram);
+        }
+    }
+    
+}
+
+//************************************************
+//人脸识别
+//************************************************
+
+void face_recognize(int count)
+{
+    while (1)
+    {
+        // handle_key();
+        // if (g_change_state)
+        // {
+        //     g_change_state = 0;
+        //     break;
+        // }
+        g_dvp_finish_flag = 0;
+        dvp_clear_interrupt(DVP_STS_FRAME_START | DVP_STS_FRAME_FINISH);
+        dvp_config_interrupt(DVP_CFG_START_INT_ENABLE | DVP_CFG_FINISH_INT_ENABLE, 1);
+        while (g_dvp_finish_flag == 0)
+            ;
+        /* run face detect */
+        g_ai_done_flag = 0;
+        kpu_start(&detect_task);
+        while(!g_ai_done_flag);
+        region_layer_run(&detect_rl, &detect_info);
+        /* run key point detect */
+        for (uint32_t face_cnt = 0; face_cnt < detect_info.obj_number; face_cnt++)
+        {
+            crop_image.pixel = 3;
+            crop_image.width = detect_info.obj[face_cnt].x2 - detect_info.obj[face_cnt].x1 + 1;
+            crop_image.height = detect_info.obj[face_cnt].y2 - detect_info.obj[face_cnt].y1 + 1;
+            key_point.width = crop_image.width;
+            key_point.height = crop_image.height;
+            if (crop_image.width < 80 || crop_image.height < 100)
+            {
+                draw_edge(display_image.addr, &detect_info, face_cnt, RED);
+                continue;
+            }
+            image_init(&crop_image);
+            image_crop(&kpu_image, &crop_image, detect_info.obj[face_cnt].x1, detect_info.obj[face_cnt].y1);
+            image_resize(&crop_image, &resize_image);
+            image_deinit(&crop_image);
+            g_ai_done_flag = 0;
+            kpu_start(&key_point_task);
+            while(!g_ai_done_flag);
+            key_point_last_handle(&key_point_task, &key_point);
+            double matrix_src[5][2], matrix_dst[10];
+            for (uint32_t point_cnt = 0; point_cnt < 5; point_cnt++)
+            {
+                key_point.point[point_cnt].x += detect_info.obj[face_cnt].x1;
+                key_point.point[point_cnt].y += detect_info.obj[face_cnt].y1;
+                matrix_src[point_cnt][0] = key_point.point[point_cnt].x;
+                matrix_src[point_cnt][1] = key_point.point[point_cnt].y;
+            }
+            draw_key_point(display_image.addr, &key_point);
+            image_umeyama(&matrix_src, &matrix_dst);
+            image_similarity(&kpu_image, &resize_image, matrix_dst);
+
+            feature1_task.src = resize_image.addr;
+            g_ai_done_flag = 0;
+            kpu_start(&feature1_task);
+            while (!g_ai_done_flag);
+            quantize_param_t q1 = {.scale = 0.0125532000672583, .bias = 0 }, q2 = {.scale = 0.00478086798798804, .bias = 0};
+            kpu_global_average_pool(feature1_task.dst, &q1, 16, 1024, AI_IO_BASE_ADDR + feature2_task.layers[0].image_addr.data.image_src_addr * 64, &q2);
+            g_ai_done_flag = 0;
+            kpu_start(&feature2_task);
+            while (!g_ai_done_flag);
+            quantize_param_t q = {.scale = feature2_task.output_scale, .bias = feature2_task.output_bias};
+            float features[FEATURE_DIMENSION], features_tmp[FEATURE_DIMENSION];
+            kpu_matmul_end(feature2_task.dst, FEATURE_DIMENSION, features, &q);
+            l2normalize(features, features_tmp, FEATURE_DIMENSION);
+
+            float score, score_max = 0;
+            uint32_t score_index = 0;
+            score_index = calulate_score(features_tmp, &score_max);
+
+            sprintf(display_string, "%.2f", score_max);
+            if (score_max > FACE_RECGONITION_SCORE)
+            {
+                draw_edge(display_image.addr, &detect_info, face_cnt, GREEN);
+                sprintf(display_string, "%d  %.2f", score_index, score_max);
+                ram_draw_string(display_image.addr, detect_info.obj[face_cnt].x1, detect_info.obj[face_cnt].y1 - 16, display_string, GREEN);
+                count++;
+            }
+            else
+            {
+                draw_edge(display_image.addr, &detect_info, face_cnt, RED);
+                ram_draw_string(display_image.addr, detect_info.obj[face_cnt].x1, detect_info.obj[face_cnt].y1 - 16, display_string, RED);
+            }
+        }
+
+        /* display result */
+        lcd_draw_picture(0, 0, 320, 240, display_image.addr);
+        if(count > 5)
+            break;
+    }
+}
+
+
 int main(void)
 {
     /* Set CPU and dvp clk */
@@ -398,95 +682,9 @@ int main(void)
     sysctl_enable_irq();
     /* system start */
     printf("System start\n");
-    while (1)
-    {
-        handle_key();
-        g_dvp_finish_flag = 0;
-        dvp_clear_interrupt(DVP_STS_FRAME_START | DVP_STS_FRAME_FINISH);
-        dvp_config_interrupt(DVP_CFG_START_INT_ENABLE | DVP_CFG_FINISH_INT_ENABLE, 1);
-        while (g_dvp_finish_flag == 0)
-            ;
-        /* run face detect */
-        g_ai_done_flag = 0;
-        kpu_start(&detect_task);
-        while(!g_ai_done_flag);
-        region_layer_run(&detect_rl, &detect_info);
-        /* run key point detect */
-        for (uint32_t face_cnt = 0; face_cnt < detect_info.obj_number; face_cnt++)
-        {
-            crop_image.pixel = 3;
-            crop_image.width = detect_info.obj[face_cnt].x2 - detect_info.obj[face_cnt].x1 + 1;
-            crop_image.height = detect_info.obj[face_cnt].y2 - detect_info.obj[face_cnt].y1 + 1;
-            key_point.width = crop_image.width;
-            key_point.height = crop_image.height;
-            if (crop_image.width < 80 || crop_image.height < 100)
-            {
-                draw_edge(display_image.addr, &detect_info, face_cnt, RED);
-                continue;
-            }
-            image_init(&crop_image);
-            image_crop(&kpu_image, &crop_image, detect_info.obj[face_cnt].x1, detect_info.obj[face_cnt].y1);
-            image_resize(&crop_image, &resize_image);
-            image_deinit(&crop_image);
-            g_ai_done_flag = 0;
-            kpu_start(&key_point_task);
-            while(!g_ai_done_flag);
-            key_point_last_handle(&key_point_task, &key_point);
-            double matrix_src[5][2], matrix_dst[10];
-            for (uint32_t point_cnt = 0; point_cnt < 5; point_cnt++)
-            {
-                key_point.point[point_cnt].x += detect_info.obj[face_cnt].x1;
-                key_point.point[point_cnt].y += detect_info.obj[face_cnt].y1;
-                matrix_src[point_cnt][0] = key_point.point[point_cnt].x;
-                matrix_src[point_cnt][1] = key_point.point[point_cnt].y;
-            }
-            draw_key_point(display_image.addr, &key_point);
-            image_umeyama(&matrix_src, &matrix_dst);
-            image_similarity(&kpu_image, &resize_image, matrix_dst);
 
-            feature1_task.src = resize_image.addr;
-            g_ai_done_flag = 0;
-            kpu_start(&feature1_task);
-            while (!g_ai_done_flag);
-            quantize_param_t q1 = {.scale = 0.0125532000672583, .bias = 0 }, q2 = {.scale = 0.00478086798798804, .bias = 0};
-            kpu_global_average_pool(feature1_task.dst, &q1, 16, 1024, AI_IO_BASE_ADDR + feature2_task.layers[0].image_addr.data.image_src_addr * 64, &q2);
-            g_ai_done_flag = 0;
-            kpu_start(&feature2_task);
-            while (!g_ai_done_flag);
-            quantize_param_t q = {.scale = feature2_task.output_scale, .bias = feature2_task.output_bias};
-            float features[FEATURE_DIMENSION], features_tmp[FEATURE_DIMENSION];
-            kpu_matmul_end(feature2_task.dst, FEATURE_DIMENSION, features, &q);
-            l2normalize(features, features_tmp, FEATURE_DIMENSION);
-
-            if(g_key_press)
-            {
-                if(flash_save_face_info(NULL, features_tmp) < 0)
-                {
-                    printf("Feature Full\n");
-                    break;
-                }
-                g_key_press = 0;
-            }
-
-            float score, score_max = 0;
-            uint32_t score_index = 0;
-            score_index = calulate_score(features_tmp, &score_max);
-
-            sprintf(display_string, "%.2f", score_max);
-            if (score_max > FACE_RECGONITION_SCORE)
-            {
-                draw_edge(display_image.addr, &detect_info, face_cnt, GREEN);
-                sprintf(display_string, "%d  %.2f", score_index, score_max);
-                ram_draw_string(display_image.addr, detect_info.obj[face_cnt].x1, detect_info.obj[face_cnt].y1 - 16, display_string, GREEN);
-            }
-            else
-            {
-                draw_edge(display_image.addr, &detect_info, face_cnt, RED);
-                ram_draw_string(display_image.addr, detect_info.obj[face_cnt].x1, detect_info.obj[face_cnt].y1 - 16, display_string, RED);
-            }
-        }
-
-        /* display result */
-        lcd_draw_picture(0, 0, 320, 240, display_image.addr);
-    }
+    add_face();
+    time_alarm();
+    face_recognize(0);    
+    time_alarm();
 }
