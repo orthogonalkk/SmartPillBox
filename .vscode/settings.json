@@ -6,6 +6,8 @@
         "fpioa.h": "c",
         "string.h": "c",
         "gc0328.h": "c",
-        "kpu.h": "c"
+        "kpu.h": "c",
+        "uart.h": "c",
+        "uarths.h": "c"
     }
 }

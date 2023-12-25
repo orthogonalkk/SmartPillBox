@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include "uart.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <math.h>
@@ -65,6 +66,23 @@ static uint32_t person_count = 0;
 static float features_save[PERSON_MAX][FEATURE_DIMENSION];
 
 uint16_t g_lcd_gram[LCD_X_MAX * LCD_Y_MAX ];
+
+#define RECV_LENGTH  20
+
+#define UART_NUM    UART_DEVICE_3
+
+struct content
+{
+    /* data */
+    char name[20];
+    char how[40];
+    int count_time;
+};
+
+struct content total_medicine[20];
+int medicine_count = 0;
+int medicine_interval = 0;
+int dose_time = 0;
 
 
 static void ai_done(void)
@@ -328,6 +346,7 @@ void add_face()
         if (g_change_state)
         {
             g_change_state = 0;
+            lcd_clear(BLACK);   
             break;
         }
         g_dvp_finish_flag = 0;
@@ -415,10 +434,139 @@ void add_face()
             }
         }
 
+        char *hel = {"add identify:"};
+        ram_draw_string(display_image.addr, 10, 10, hel , RED);   
+
         /* display result */
         lcd_draw_picture(0, 0, 320, 240, display_image.addr);
     }
 }
+
+//********************************************************************************
+// UART INPUT
+//********************************************************************************
+void input_info()
+{
+    char *state = {"enter your medicine information"};
+    char *hel_0 = {"please enter the medicine  \n"};
+    char *hel_1 = {"please enter how you take medicine (for example: before meal)  \n"};
+
+    char *hel = {"please enter the interval you take medicine (seconds)  \n"};
+
+    char recv = 0;
+    int rec_flag = 0;
+    char cmd[20] = {};
+    int len = 0;
+
+    while (1)
+    {   
+        ram_draw_string((uint32_t* ) g_lcd_gram, 20, 20, state , RED);
+        lcd_draw_picture(0,0, LCD_Y_MAX, LCD_X_MAX,(uint32_t*) g_lcd_gram);
+        memset(g_lcd_gram, 0, sizeof(g_lcd_gram));
+        if (rec_flag == 0)
+        {
+            //uarths_send_data((uint8_t *)hel_0, strlen(hel_0));
+            uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *)hel_0, strlen(hel_0));
+        }
+        else if(rec_flag == 1)
+        {
+            //uarths_send_data((uint8_t *)hel_1, strlen(hel_1));
+            uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *)hel_1, strlen(hel_1));
+        }
+
+        while (1)
+        {   
+            //uarths_receive_data((uint8_t *)&recv, 1);    /*block wait for receive*/
+            uart_receive_data_dma(UART_NUM, DMAC_CHANNEL1, (uint8_t *)&recv, 1);    /*block wait for receive*/
+            if (recv == '\r') {
+                continue;
+            }
+            else if (recv == '\n')
+            {
+                //uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *)cmd, strlen(cmd));
+                //printf("%s\n", cmd);
+                if (strcmp(cmd, "q") == 0)
+                {
+                    // uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *)cmd, strlen(cmd));
+                    rec_flag =2;
+                }
+                if (rec_flag == 0) // name
+                {
+                    sprintf(total_medicine[medicine_count].name, "%s", cmd);
+                    // uart_send_data_dma(UART_NUM, DMAC_CHANNEL2, (uint8_t *)cmd, strlen(cmd));
+                    rec_flag =1;
+                }
+                else if (rec_flag == 1) // how
+                {
+                    sprintf(total_medicine[medicine_count].how, "%s", cmd);
+                    rec_flag =  0;
+                    medicine_count ++;
+                }  
+                len = 0;
+                cmd[0] = 0;
+                break;
+            }
+            else {
+                cmd[len++] = recv;
+                cmd[len] = 0;
+                if(len >= RECV_LENGTH)
+                {
+                    len = 0;
+                    *cmd =0;
+                    rec_flag = 0;
+                } 
+            }
+        }
+       if (rec_flag == 2)
+       {
+            *cmd = 0;
+           break;
+       }
+    }
+    // get time
+    //uarths_send_data((uint8_t *)hel, strlen(hel));
+    uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *)hel, strlen(hel));
+    while(1)
+    {
+        //uarths_receive_data((uint8_t *)&recv, 1);    /*block wait for receive*/
+        uart_receive_data_dma(UART_NUM, DMAC_CHANNEL1, (uint8_t *)&recv, 1);    /*block wait for receive*/
+        if (recv == '\r') {
+                continue;
+            }
+        else if (recv == '\n')
+        {
+            medicine_interval = atoi(cmd);
+            break;
+        }
+        cmd [len++] = recv;
+    }
+
+}
+
+/*
+LCD 显示计时
+*/
+
+void LCD_timer()
+{
+    memset(g_lcd_gram, 0, sizeof(g_lcd_gram));
+    lcd_draw_picture(0,0, LCD_Y_MAX, LCD_X_MAX,(uint32_t*) g_lcd_gram);
+    int t = medicine_interval;
+    char *hel = {"count down:"};
+    while (t>=0)
+    {
+        char time[10];
+        itoa(t, time, 10 );
+        ram_draw_string((uint32_t* ) g_lcd_gram, 20, 100, hel, RED);
+        ram_draw_string((uint32_t* ) g_lcd_gram, 170, 100, time, RED);
+        lcd_draw_picture(0,0, LCD_Y_MAX, LCD_X_MAX,(uint32_t*) g_lcd_gram);
+        sleep(1);
+        memset(g_lcd_gram, 0, sizeof(g_lcd_gram));
+        t--;
+    }
+    
+}
+
 
 //************************************************
 //LCD 到时间提醒
@@ -482,6 +630,11 @@ void time_alarm()
                 g_lcd_gram[j] = colors[i];
             }
             lcd_draw_picture(0,0, LCD_Y_MAX, LCD_X_MAX,(uint32_t*) g_lcd_gram);
+            handle_key();
+            if(g_key_press == 1)
+            {
+                break;
+            }
         }
     }
     
@@ -580,9 +733,49 @@ void face_recognize(int count)
         /* display result */
         lcd_draw_picture(0, 0, 320, 240, display_image.addr);
         if(count > 5)
+        {
+            lcd_clear(BLACK);
             break;
+        }
     }
 }
+
+/*
+LCD 显示药品资料
+*/
+void LCD_show()
+{
+    memset(g_lcd_gram, 0, sizeof(g_lcd_gram));
+    char *hel = {"dose count:"};
+    ram_draw_string((uint32_t* ) g_lcd_gram, 20, 20, hel , RED);    
+    int x =20, y= 50;
+    char dose[10];
+    itoa(dose_time, dose, 10 );
+    ram_draw_string((uint32_t* ) g_lcd_gram, 170, 20, dose , RED);
+    for(int i =0; i< medicine_count;i++)
+    {
+        ram_draw_string((uint32_t* ) g_lcd_gram, x, y, total_medicine[i].name, WHITE);
+        // uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *) total_medicine[i].name , strlen(total_medicine[i].name));
+        x += 150;
+        ram_draw_string((uint32_t* ) g_lcd_gram, x, y, total_medicine[i].how, WHITE);
+        // uart_send_data_dma(UART_NUM, DMAC_CHANNEL0, (uint8_t *) total_medicine[i].how , strlen(total_medicine[i].how));
+        y += 20;
+        x = 20;
+    }
+    lcd_draw_picture(0,0, LCD_Y_MAX, LCD_X_MAX,(uint32_t*) g_lcd_gram);
+    while(1)
+    {
+        handle_key();
+        if (g_key_press == 1)
+        {
+            g_key_press = 0;
+            dose_time ++;
+            break;
+            memset(g_lcd_gram, 0, sizeof(g_lcd_gram));
+        }
+    }
+}
+
 
 
 int main(void)
@@ -595,6 +788,11 @@ int main(void)
     io_set_power();
     plic_init();
     io_mux_init();
+
+
+    /* inint uart */
+    uart_init(UART_NUM);
+    uart_configure(UART_NUM, 115200, 8, UART_STOP_1, UART_PARITY_NONE);
 	
     /* flash init */
     flash_init();
@@ -684,7 +882,12 @@ int main(void)
     printf("System start\n");
 
     add_face();
-    time_alarm();
-    face_recognize(0);    
-    time_alarm();
+    input_info();
+    while (1)
+    {
+        LCD_timer();
+        time_alarm();
+        face_recognize(0);    
+        LCD_show();
+    }
 }
