@@ -126,7 +126,7 @@ volatile uint64_t g_change_state = 0;
 
 int irq_gpiohs(void* ctx)
 {
-    printf("Key Working\n");
+    // printf("Key Working\n");
     g_gpio_flag = 1;
     g_gpio_time = sysctl_get_time_us();
     return 0;
