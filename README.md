@@ -1,12 +1,23 @@
-# Kendryte K210 standalone SDK
+# A smart pill box that support face detection
 
-[![Build Status](https://travis-ci.org/kendryte/kendryte-standalone-sdk.svg)](https://travis-ci.org/kendryte/kendryte-standalone-sdk)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-This SDK is for Kendryte K210 without OS support.
-If you have any questions, please be free to contact us.
+This is my project for **Embedded System Programming and Practices in autumn 2023**. It utilizes PaddlePi-K210 to implement a smart pill box that support face detection and authentication.
 
-## Usage
+## Implemented functions
+- face detection, feature extraction and use face information for authentication
+- data transmission via UART (Drug information, how and when to take it)
+- Use LCD flashing as a medication reminder
+- a timer
+
+## How to use
+
+
+
+To compile this code, you need to utilize SDK fot Kendryte K210.
+The followings are how to use this SDK.
+
+### Usage
 
 If you want to start a new project, for instance, `hello_world`, you only need to:
 
