@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-This is my project for **Embedded System Programming and Practices in autumn 2023**. It utilizes PaddlePi-K210 to implement a smart pill box that support face detection and authentication.
+This is my project for **Embedded System Programming and Practices in autumn 2023**. It utilizes PaddlePi-K210 to implement a smart pill box that supports face detection and authentication.
 
 ## Implemented functions
 - face detection, feature extraction and use face information for authentication
